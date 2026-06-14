@@ -623,6 +623,7 @@ function chooseEnemyDir(e){
 function draw(){
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle='#10151f'; ctx.fillRect(0,0,W,H);
+  if(!grid || grid.length<GRID){ return; } // 网格尚未加载，先不画地图
   ctx.fillStyle='#141b27';
   for(let r=0;r<GRID;r++)for(let c=0;c<GRID;c++) if((r+c)&1) ctx.fillRect(c*TILE,r*TILE,TILE,TILE);
 
@@ -920,7 +921,11 @@ document.getElementById('btnSound').onclick=()=>{
 };
 
 // ====================== 主循环 ======================
-function loop(){ update(); draw(); requestAnimationFrame(loop); }
+function loop(){
+  try{ update(); draw(); }
+  catch(e){ console.error(e); } // 单帧出错也不让动画循环中断
+  requestAnimationFrame(loop);
+}
 requestAnimationFrame(loop);
 
 document.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
