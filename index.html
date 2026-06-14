@@ -51,6 +51,18 @@
   }
   .swatch.sel { border-color: #fff; transform: scale(1.18); box-shadow: 0 0 18px rgba(255,255,255,.6); }
   .swatch:active { transform: scale(1.05); }
+
+  .ships { display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap; justify-content: center; }
+  .ship-card {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 8px 6px 6px; border-radius: 14px; cursor: pointer;
+    border: 3px solid rgba(255,255,255,.18); background: rgba(255,255,255,.04);
+    transition: transform .1s, border-color .1s, background .1s;
+  }
+  .ship-card.sel { border-color: #ffd34e; background: rgba(255,211,78,.14); transform: scale(1.06); }
+  .ship-card:active { transform: scale(1.0); }
+  .ship-card canvas { width: 60px; height: 60px; display: block; }
+  .ship-card span { font-size: 12px; color: #cdd8ff; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -61,7 +73,9 @@
   <div class="title">太空英雄</div>
   <div class="subtitle">闯过 3 关，打败大 Boss！</div>
   <div class="tip">👆 按住屏幕拖动 = 移动飞船<br>💥 飞船会自动射击<br>🎁 吃道具变更强 · 🛡️ 躲开敌人和子弹</div>
-  <div class="pick-label">选择你的飞船颜色 👇</div>
+  <div class="pick-label">选择你的飞机 ✈️</div>
+  <div class="ships" id="ships"></div>
+  <div class="pick-label">选择飞船颜色 🎨</div>
   <div class="colors" id="colors"></div>
   <button class="btn" id="startBtn">开始游戏</button>
 </div>
@@ -147,6 +161,79 @@
   ];
   let selectedColor = +(localStorage.getItem("spaceHeroColor") || 0);
   if (selectedColor < 0 || selectedColor >= SHIP_COLORS.length) selectedColor = 0;
+
+  // ---------- 飞机机型（玩家可选不同形状） ----------
+  const SHIPS = [
+    { name: "经典战机" },   // 0 箭头
+    { name: "飞翼战机" },   // 1 三角飞翼
+    { name: "火箭飞船" },   // 2 圆头火箭
+    { name: "穿梭战机" },   // 3 双翼穿梭机
+  ];
+  let selectedShip = +(localStorage.getItem("spaceHeroShip") || 0);
+  if (selectedShip < 0 || selectedShip >= SHIPS.length) selectedShip = 0;
+
+  // 绘制机身（ctx 已平移到飞机中心）。shipIdx 决定形状，c 为颜色，showFlame 控制尾焰
+  function drawShipBody(g, shipIdx, r, c, showFlame, boosting) {
+    // 尾焰
+    if (showFlame) {
+      const flame = 10 + Math.sin(frame * 0.5) * 6;
+      g.beginPath();
+      g.moveTo(-8, r * 0.4); g.lineTo(0, r * 0.4 + flame + (boosting?12:0)); g.lineTo(8, r * 0.4);
+      g.fillStyle = boosting ? "#5ec8ff" : "#ffb347";
+      g.fill();
+    }
+    const grad = g.createLinearGradient(0, -r, 0, r);
+    grad.addColorStop(0, c.top); grad.addColorStop(0.5, c.mid); grad.addColorStop(1, c.bot);
+    g.fillStyle = grad;
+
+    if (shipIdx === 1) {
+      // 飞翼战机：宽大三角翼
+      g.beginPath();
+      g.moveTo(0, -r);
+      g.lineTo(r * 1.05, r * 0.8);
+      g.lineTo(r * 0.3, r * 0.4);
+      g.lineTo(0, r * 0.7);
+      g.lineTo(-r * 0.3, r * 0.4);
+      g.lineTo(-r * 1.05, r * 0.8);
+      g.closePath(); g.fill();
+    } else if (shipIdx === 2) {
+      // 火箭飞船：圆头机身 + 两侧尾翼
+      g.fillStyle = c.bot;
+      g.beginPath(); g.moveTo(-r*0.6, r*0.2); g.lineTo(-r, r*0.8); g.lineTo(-r*0.45, r*0.7); g.closePath(); g.fill();
+      g.beginPath(); g.moveTo(r*0.6, r*0.2); g.lineTo(r, r*0.8); g.lineTo(r*0.45, r*0.7); g.closePath(); g.fill();
+      g.fillStyle = grad;
+      g.beginPath();
+      g.moveTo(0, -r);
+      g.quadraticCurveTo(r*0.55, -r*0.4, r*0.5, r*0.4);
+      g.lineTo(-r*0.5, r*0.4);
+      g.quadraticCurveTo(-r*0.55, -r*0.4, 0, -r);
+      g.closePath(); g.fill();
+    } else if (shipIdx === 3) {
+      // 穿梭战机：细机身 + 两侧外伸机翼/引擎舱
+      g.fillStyle = c.mid;
+      g.fillRect(-r*1.0, -r*0.1, r*0.45, r*0.9); // 左翼
+      g.fillRect(r*0.55, -r*0.1, r*0.45, r*0.9); // 右翼
+      g.fillStyle = grad;
+      g.beginPath();
+      g.moveTo(0, -r);
+      g.lineTo(r*0.4, r*0.6);
+      g.lineTo(0, r*0.35);
+      g.lineTo(-r*0.4, r*0.6);
+      g.closePath(); g.fill();
+    } else {
+      // 经典战机：箭头
+      g.beginPath();
+      g.moveTo(0, -r);
+      g.lineTo(r * 0.85, r * 0.7);
+      g.lineTo(0, r * 0.35);
+      g.lineTo(-r * 0.85, r * 0.7);
+      g.closePath(); g.fill();
+    }
+    // 座舱
+    g.beginPath();
+    g.arc(0, -r * 0.1, r * 0.28, 0, Math.PI * 2);
+    g.fillStyle = c.cockpit; g.fill();
+  }
 
   // ---------- 三关配置（每关有自己的背景主题与难度） ----------
   const MAX_LEVEL = 3;
@@ -518,27 +605,7 @@
   function drawShip(x, y, r) {
     ctx.save();
     ctx.translate(x, y);
-    // 尾焰
-    const flame = 10 + Math.sin(frame * 0.5) * 6;
-    ctx.beginPath();
-    ctx.moveTo(-8, r * 0.4); ctx.lineTo(0, r * 0.4 + flame + (speedBoost>0?12:0)); ctx.lineTo(8, r * 0.4);
-    ctx.fillStyle = speedBoost > 0 ? "#5ec8ff" : "#ffb347";
-    ctx.fill();
-    // 机身
-    ctx.beginPath();
-    ctx.moveTo(0, -r);
-    ctx.lineTo(r * 0.85, r * 0.7);
-    ctx.lineTo(0, r * 0.35);
-    ctx.lineTo(-r * 0.85, r * 0.7);
-    ctx.closePath();
-    const c = SHIP_COLORS[selectedColor];
-    const g = ctx.createLinearGradient(0, -r, 0, r);
-    g.addColorStop(0, c.top); g.addColorStop(0.5, c.mid); g.addColorStop(1, c.bot);
-    ctx.fillStyle = g; ctx.fill();
-    // 座舱
-    ctx.beginPath();
-    ctx.arc(0, -r * 0.1, r * 0.28, 0, Math.PI * 2);
-    ctx.fillStyle = c.cockpit; ctx.fill();
+    drawShipBody(ctx, selectedShip, r, SHIP_COLORS[selectedColor], true, speedBoost > 0);
     ctx.restore();
 
     // 护盾
@@ -764,6 +831,43 @@
   document.getElementById("startBtn").addEventListener("click", startGame);
   document.getElementById("restartBtn").addEventListener("click", startGame);
 
+  // ---------- 飞机机型选择器（带小预览图） ----------
+  const shipCanvases = [];
+  function renderShipPreview(cv, shipIdx) {
+    const g = cv.getContext("2d");
+    const s = cv.width; // 正方形
+    g.clearRect(0, 0, s, s);
+    g.save();
+    g.translate(s/2, s/2 + s*0.05);
+    drawShipBody(g, shipIdx, s*0.34, SHIP_COLORS[selectedColor], false, false);
+    g.restore();
+  }
+  function refreshShipPreviews() {
+    shipCanvases.forEach((cv, i) => renderShipPreview(cv, i));
+  }
+  (function buildShips() {
+    const box = document.getElementById("ships");
+    SHIPS.forEach((sh, i) => {
+      const card = document.createElement("div");
+      card.className = "ship-card" + (i === selectedShip ? " sel" : "");
+      const cv = document.createElement("canvas");
+      cv.width = 110; cv.height = 110;
+      const label = document.createElement("span");
+      label.textContent = sh.name;
+      card.appendChild(cv); card.appendChild(label);
+      shipCanvases.push(cv);
+      renderShipPreview(cv, i);
+      card.addEventListener("click", () => {
+        selectedShip = i;
+        localStorage.setItem("spaceHeroShip", i);
+        box.querySelectorAll(".ship-card").forEach(c => c.classList.remove("sel"));
+        card.classList.add("sel");
+        initAudio(); sfx.power();
+      });
+      box.appendChild(card);
+    });
+  })();
+
   // ---------- 飞船颜色选择器 ----------
   (function buildColors() {
     const box = document.getElementById("colors");
@@ -777,6 +881,7 @@
         localStorage.setItem("spaceHeroColor", i);
         box.querySelectorAll(".swatch").forEach(s => s.classList.remove("sel"));
         sw.classList.add("sel");
+        refreshShipPreviews(); // 颜色变了，刷新机型预览
         initAudio(); sfx.power();
       });
       box.appendChild(sw);
