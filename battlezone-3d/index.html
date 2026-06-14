@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>⚔️ 钢铁战区 · BATTLEZONE 3D</title>
+<style>
+  :root{
+    --hp:#4ade80; --hp-low:#ef4444; --accent:#ffd23f; --ink:#e8ecff;
+    --enemy:#ff5a5a; --panel:rgba(12,16,28,.62);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{width:100%; height:100%; overflow:hidden; background:#0b0e16;
+    font-family:"Trebuchet MS","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    color:var(--ink); cursor:default; user-select:none;}
+  #game{position:fixed; inset:0;}
+  canvas{display:block;}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed; inset:0; pointer-events:none; z-index:10;}
+  .hidden{display:none !important;}
+
+  /* crosshair */
+  #crosshair{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:26px; height:26px; opacity:.9;}
+  #crosshair::before,#crosshair::after{content:""; position:absolute; background:#fff; box-shadow:0 0 2px #000;}
+  #crosshair::before{left:50%; top:0; width:2px; height:100%; transform:translateX(-50%);}
+  #crosshair::after{top:50%; left:0; height:2px; width:100%; transform:translateY(-50%);}
+  #crosshair .dot{position:absolute; left:50%; top:50%; width:4px; height:4px; border-radius:50%;
+    background:var(--accent); transform:translate(-50%,-50%); box-shadow:0 0 3px #000;}
+  #hitmark{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) rotate(45deg);
+    width:22px; height:22px; opacity:0; transition:opacity .08s;}
+  #hitmark::before,#hitmark::after{content:""; position:absolute; background:#ff4d4d;}
+  #hitmark::before{left:50%; top:0; width:3px; height:100%; transform:translateX(-50%);}
+  #hitmark::after{top:50%; left:0; height:3px; width:100%; transform:translateY(-50%);}
+
+  /* bottom-left: health */
+  #hp-wrap{position:absolute; left:22px; bottom:22px; width:280px;}
+  #hp-label{font-size:13px; letter-spacing:2px; opacity:.8; margin-bottom:4px; text-shadow:0 1px 3px #000;}
+  #hp-bar{height:18px; background:rgba(0,0,0,.45); border:2px solid #ffffff30; border-radius:10px; overflow:hidden;}
+  #hp-fill{height:100%; width:100%; background:linear-gradient(90deg,#22c55e,#4ade80);
+    transition:width .15s, background .3s;}
+  #hp-num{font-size:22px; font-weight:bold; margin-top:2px; text-shadow:0 2px 4px #000;}
+
+  /* bottom-right: weapon + ammo */
+  #weapon-wrap{position:absolute; right:22px; bottom:150px; text-align:right;}
+  #weapon-name{font-size:22px; font-weight:bold; color:var(--accent); text-shadow:0 2px 5px #000; letter-spacing:1px;}
+  #weapon-icon{font-size:30px; line-height:1;}
+  #ammo{font-size:40px; font-weight:bold; text-shadow:0 2px 5px #000; line-height:1; margin-top:2px;}
+  #ammo .reserve{font-size:22px; opacity:.7;}
+  #reloading{font-size:15px; color:var(--accent); opacity:0; transition:opacity .15s;}
+
+  /* 右下角：武器操作提示（给小朋友看的） */
+  #controls-hint{position:absolute; right:22px; bottom:16px; text-align:right;
+    background:var(--panel); border:2px solid #ffd23f66; border-radius:12px; padding:8px 12px;
+    font-size:14px; line-height:1.7; max-width:300px; box-shadow:0 4px 14px #00000050;}
+  #controls-hint .t{color:var(--accent); font-weight:bold; font-size:13px; letter-spacing:1px; margin-bottom:2px;}
+  #controls-hint .k{display:inline-block; background:#fff; color:#1a1a1a; border-radius:5px; padding:0 7px;
+    margin:0 1px; font-weight:bold; font-size:12.5px;}
+
+  /* weapon slots */
+  #slots{position:absolute; right:22px; bottom:258px; display:flex; flex-direction:column; gap:6px; align-items:flex-end;}
+  .slot{display:flex; align-items:center; gap:8px; background:var(--panel); border:1px solid #ffffff20;
+    border-radius:8px; padding:5px 10px; font-size:14px; opacity:.5; transition:.15s; min-width:150px; justify-content:flex-end;}
+  .slot.has{opacity:.85;}
+  .slot.active{opacity:1; border-color:var(--accent); box-shadow:0 0 12px #ffd23f55; transform:scale(1.05);}
+  .slot .num{color:var(--accent); font-weight:bold;}
+  .slot .ico{font-size:18px;}
+
+  /* top-center: wave + score */
+  #topbar{position:absolute; top:16px; left:50%; transform:translateX(-50%); text-align:center;}
+  #wave{font-size:20px; font-weight:bold; letter-spacing:3px; text-shadow:0 2px 4px #000;}
+  #wave .num{color:var(--accent);}
+  #enemies-left{font-size:15px; margin-top:2px; text-shadow:0 1px 3px #000;}
+  #enemies-left b, #enemies-num{color:#ff8a8a; font-weight:bold;}
+  #allies-left{font-size:15px; margin-top:1px; text-shadow:0 1px 3px #000;}
+  #allies-num{color:#7fd0ff; font-weight:bold;}
+  #score{font-size:14px; opacity:.85; margin-top:1px; text-shadow:0 1px 3px #000;}
+
+  /* damage / low-hp vignette */
+  #vignette{position:absolute; inset:0; pointer-events:none; opacity:0;
+    box-shadow:inset 0 0 180px 40px rgba(220,0,0,.75); transition:opacity .25s;}
+  #flash{position:absolute; inset:0; background:#ff2b2b; opacity:0; pointer-events:none;}
+
+  /* toast messages */
+  #toasts{position:absolute; left:50%; bottom:120px; transform:translateX(-50%);
+    display:flex; flex-direction:column; gap:6px; align-items:center;}
+  .toast{background:var(--panel); border:1px solid #ffffff25; border-radius:20px; padding:6px 16px;
+    font-size:15px; text-shadow:0 1px 2px #000; animation:toastIn .25s ease;}
+  .toast b{color:var(--accent);}
+  @keyframes toastIn{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);}}
+
+  /* tank prompt */
+  #prompt{position:absolute; left:50%; top:58%; transform:translateX(-50%); text-align:center;
+    background:var(--panel); border:1px solid var(--accent); border-radius:10px; padding:8px 18px;
+    font-size:16px; opacity:0; transition:opacity .15s;}
+  #prompt .key{display:inline-block; background:#fff; color:#111; border-radius:5px; padding:0 8px;
+    font-weight:bold; margin:0 2px;}
+
+  /* ---------- overlays ---------- */
+  .overlay{position:fixed; inset:0; z-index:20; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:14px; text-align:center; padding:24px;
+    background:radial-gradient(circle at 50% 30%, rgba(20,26,45,.82), rgba(6,8,14,.94));
+    backdrop-filter:blur(2px);}
+  .overlay.hidden{display:none;}
+  .overlay h1{font-size:clamp(34px,8vw,68px); letter-spacing:4px;
+    text-shadow:0 4px 0 #000, 0 0 30px #ffd23f55; color:#fff;}
+  .overlay h1 .red{color:var(--enemy);}
+  .overlay h2{font-size:clamp(26px,6vw,44px); text-shadow:0 3px 0 #000;}
+  .overlay .sub{font-size:15px; letter-spacing:4px; opacity:.7; margin-top:-8px;}
+  .controls{display:grid; grid-template-columns:auto auto; gap:8px 26px; text-align:left;
+    background:rgba(255,255,255,.06); border:1px solid #ffffff18; border-radius:14px;
+    padding:18px 26px; font-size:15.5px; line-height:1.5; margin-top:6px;}
+  .controls .k{font-weight:bold; color:var(--accent);}
+  .key{display:inline-block; min-width:22px; padding:2px 8px; margin:0 2px; background:#2a3050; color:#fff;
+    border-radius:6px; border-bottom:2px solid #00000070; font-weight:bold; font-size:13px; text-align:center;}
+  .btn{margin-top:10px; padding:15px 44px; font-size:22px; font-weight:bold; border:none; border-radius:14px;
+    cursor:pointer; pointer-events:auto; color:#3a2b00; letter-spacing:1px;
+    background:linear-gradient(180deg,#ffe066,#ffb703); box-shadow:0 6px 0 #c98a00, 0 10px 22px #00000060;
+    transition:transform .06s, box-shadow .06s;}
+  .btn:hover{filter:brightness(1.05);}
+  .btn:active{transform:translateY(4px); box-shadow:0 2px 0 #c98a00, 0 4px 12px #00000060;}
+  .btn.red{background:linear-gradient(180deg,#ff8a8a,#e0432b); color:#fff; box-shadow:0 6px 0 #9c2014,0 10px 22px #00000060;}
+  .stat-line{font-size:18px; opacity:.92;}
+  .stat-line b{color:var(--accent); font-size:24px;}
+  #loading{position:fixed; inset:0; z-index:30; display:flex; align-items:center; justify-content:center;
+    background:#0b0e16; font-size:20px; letter-spacing:3px; color:#7d86b5;}
+</style>
+</head>
+<body>
+  <div id="game"></div>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div id="vignette"></div>
+    <div id="flash"></div>
+
+    <div id="crosshair"><span class="dot"></span></div>
+    <div id="hitmark"></div>
+
+    <div id="topbar">
+      <div id="wave">第 <span class="num" id="wave-num">1</span> 波</div>
+      <div id="enemies-left">👾 敌人 <span id="enemies-num">0</span></div>
+      <div id="allies-left">🤝 队友 <span id="allies-num">0</span></div>
+      <div id="score">得分 <span id="score-num">0</span></div>
+    </div>
+
+    <div id="hp-wrap">
+      <div id="hp-label">❤ 生命值</div>
+      <div id="hp-bar"><div id="hp-fill"></div></div>
+      <div id="hp-num">100</div>
+    </div>
+
+    <div id="slots"></div>
+
+    <div id="weapon-wrap">
+      <div id="weapon-name"><span id="weapon-icon">🔫</span> <span id="weapon-text">手枪</span></div>
+      <div id="ammo"><span id="mag">12</span><span class="reserve">/<span id="reserve">∞</span></span></div>
+      <div id="reloading">装填中…</div>
+    </div>
+
+    <div id="controls-hint">
+      <div class="t">🎮 怎么用武器</div>
+      <div id="controls-hint-body"></div>
+    </div>
+
+    <div id="toasts"></div>
+    <div id="prompt"></div>
+  </div>
+
+  <!-- Start menu -->
+  <div id="menu" class="overlay">
+    <h1>⚔️ 钢铁<span class="red">战区</span></h1>
+    <div class="sub">B A T T L E Z O N E&nbsp;&nbsp;3 D</div>
+    <p style="max-width:560px; opacity:.92; line-height:1.7">
+      和你的<b style="color:#7fd0ff">队友们</b>并肩作战！🤝 每秒都会有新队友带着武器和坦克赶来增援。<br>
+      一起打败红色的敌方士兵和坦克，捡起各种武器，保护好自己！
+    </p>
+    <div class="controls">
+      <span><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span></span><span>移动</span>
+      <span class="k">鼠标</span><span>瞄准 / 转身</span>
+      <span class="k">左键</span><span>开火</span>
+      <span class="k">右键</span><span>瞄准镜（更准）</span>
+      <span class="key">Shift</span><span>冲刺</span>
+      <span class="key">空格</span><span>跳跃</span>
+      <span class="key">R</span><span>装填弹药</span>
+      <span><span class="key">1</span>~<span class="key">5</span> / 滚轮</span><span>切换武器</span>
+      <span class="key">E</span><span>拾取武器 / 上下坦克</span>
+      <span class="key">P</span><span>暂停</span>
+    </div>
+    <button class="btn" id="play-btn">▶ 开始战斗</button>
+    <p style="font-size:13px; opacity:.55; margin-top:4px">点击后鼠标将被锁定，按 ESC 解锁</p>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause" class="overlay hidden">
+    <h2>⏸️ 暂停</h2>
+    <p style="opacity:.8">按 <span class="key">P</span> 或点击下方按钮继续</p>
+    <button class="btn" id="resume-btn">▶ 继续战斗</button>
+  </div>
+
+  <!-- Wave clear -->
+  <div id="waveclear" class="overlay hidden">
+    <h2>🎖️ 第 <span id="cleared-wave">1</span> 波 清剿完毕</h2>
+    <p class="stat-line">当前得分 <b id="wc-score">0</b></p>
+    <p style="opacity:.8" id="wc-next">下一波来袭…</p>
+  </div>
+
+  <!-- Game over -->
+  <div id="gameover" class="overlay hidden">
+    <h1 style="color:#ffd23f">哎呀，被打趴了！</h1>
+    <p class="stat-line">别灰心，你很厉害啦 💪</p>
+    <p class="stat-line">打到了第 <b id="go-wave">1</b> 波</p>
+    <p class="stat-line">得分 <b id="go-score">0</b> ，击败 <b id="go-kills">0</b> 个敌人</p>
+    <button class="btn" id="restart-btn">▶ 再来一局！</button>
+  </div>
+
+  <div id="loading">载入战场…</div>
+
+  <!-- 本地 vendor 的 three.js（绕开企业代理证书问题，无需 npm） -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three.module.js"
+    }
+  }
+  </script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
