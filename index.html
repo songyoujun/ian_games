@@ -78,7 +78,9 @@
     margin:6px 0 18px; font-size:14px; opacity:.95; max-width:460px; }
   .legend span{ display:flex; align-items:center; gap:6px; }
   .stars{ font-size:34px; letter-spacing:4px; margin:10px 0; }
-  @media (min-width:760px){ #controls{ display:none; } }
+  /* 默认显示屏幕控制器（手机/平板/iPad 等触屏设备都需要）。
+     只有真正带鼠标的电脑（精确指针 + 可悬停）才隐藏，改用键盘。 */
+  @media (hover:hover) and (pointer:fine){ #controls{ display:none; } }
 </style>
 </head>
 <body>
