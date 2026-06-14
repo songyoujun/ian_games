@@ -11,11 +11,12 @@
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     width: 100%; height: 100%; overflow: hidden;
-    background: #05050f; touch-action: none;
+    background: #05050f;
     font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
     user-select: none; -webkit-user-select: none;
   }
-  #game { display: block; width: 100vw; height: 100vh; background: #05050f; }
+  /* 只在游戏画布上禁止滑动/缩放，避免连带禁掉菜单界面的滚动 */
+  #game { display: block; width: 100vw; height: 100vh; background: #05050f; touch-action: none; }
 
   .overlay {
     position: fixed; inset: 0; display: flex; flex-direction: column;
@@ -29,26 +30,26 @@
   .overlay > .btn { margin-bottom: auto; }
   .overlay.hidden { display: none; }
   .title {
-    font-size: clamp(34px, 9vw, 84px); font-weight: 900;
+    font-size: clamp(30px, 7vw, 64px); font-weight: 900;
     background: linear-gradient(90deg,#ffd34e,#ff5e9c,#5ec8ff);
     -webkit-background-clip: text; background-clip: text; color: transparent;
     text-shadow: 0 0 30px rgba(255,120,200,.4); letter-spacing: 2px;
   }
-  .subtitle { font-size: clamp(16px,4vw,24px); margin-top: 10px; color: #c8d2ff; }
+  .subtitle { font-size: clamp(15px,3.6vw,22px); margin-top: 8px; color: #c8d2ff; }
   .btn {
-    margin-top: 34px; padding: 18px 54px; font-size: clamp(20px,5vw,30px);
+    margin-top: 22px; padding: 16px 50px; font-size: clamp(20px,5vw,30px);
     font-weight: 800; color: #061018; border: none; border-radius: 50px;
     background: linear-gradient(90deg,#ffd34e,#ff8a3d);
     box-shadow: 0 10px 30px rgba(255,160,60,.5); cursor: pointer;
     transition: transform .08s;
   }
   .btn:active { transform: scale(.93); }
-  .tip { margin-top: 22px; font-size: clamp(13px,3.4vw,18px); color: #8fa0d8; line-height: 1.9; }
-  .stat { margin-top: 18px; font-size: clamp(18px,4.5vw,26px); color:#ffe27a; font-weight:700;}
-  .emoji-row { font-size: clamp(30px,8vw,56px); margin: 14px 0; letter-spacing: 6px; }
+  .tip { margin-top: 14px; font-size: clamp(12px,3vw,16px); color: #8fa0d8; line-height: 1.7; }
+  .stat { margin-top: 16px; font-size: clamp(18px,4.5vw,26px); color:#ffe27a; font-weight:700;}
+  .emoji-row { font-size: clamp(28px,7vw,48px); margin: 6px 0; letter-spacing: 6px; }
 
-  .pick-label { margin-top: 26px; font-size: clamp(15px,3.8vw,20px); color:#cdd8ff; font-weight:700; }
-  .colors { display: flex; gap: 16px; margin-top: 16px; flex-wrap: wrap; justify-content: center; }
+  .pick-label { margin-top: 16px; font-size: clamp(14px,3.6vw,19px); color:#cdd8ff; font-weight:700; }
+  .colors { display: flex; gap: 14px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
   .swatch {
     width: 54px; height: 54px; border-radius: 50%; cursor: pointer;
     border: 4px solid rgba(255,255,255,.25); transition: transform .1s, border-color .1s;
@@ -56,17 +57,17 @@
   .swatch.sel { border-color: #fff; transform: scale(1.18); box-shadow: 0 0 18px rgba(255,255,255,.6); }
   .swatch:active { transform: scale(1.05); }
 
-  .ships { display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap; justify-content: center; }
+  .ships { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
   .ship-card {
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
-    padding: 8px 6px 6px; border-radius: 14px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 6px 5px 4px; border-radius: 12px; cursor: pointer;
     border: 3px solid rgba(255,255,255,.18); background: rgba(255,255,255,.04);
     transition: transform .1s, border-color .1s, background .1s;
   }
   .ship-card.sel { border-color: #ffd34e; background: rgba(255,211,78,.14); transform: scale(1.06); }
   .ship-card:active { transform: scale(1.0); }
-  .ship-card canvas { width: 60px; height: 60px; display: block; }
-  .ship-card span { font-size: 12px; color: #cdd8ff; font-weight: 700; }
+  .ship-card canvas { width: 50px; height: 50px; display: block; }
+  .ship-card span { font-size: 11px; color: #cdd8ff; font-weight: 700; }
 </style>
 </head>
 <body>
