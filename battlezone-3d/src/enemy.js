@@ -102,7 +102,7 @@ export class EnemyManager {
   }
 
   spawnWave(wave) {
-    const count = Math.min(16, 3 + Math.floor(wave * 1.4));
+    const count = Math.min(26, 5 + Math.floor(wave * 1.8));
     const pool = [];
     for (let i = 0; i < count; i++) {
       let t;
@@ -114,7 +114,7 @@ export class EnemyManager {
       pool.push(t);
     }
     for (const t of pool) this.enemies.push(new Enemy(this.game, t, this._spawnPoint()));
-    const tanks = wave < 2 ? 0 : Math.min(3, Math.floor(wave / 2));
+    const tanks = wave < 2 ? 0 : Math.min(4, Math.floor(wave / 2));
     for (let i = 0; i < tanks; i++) this.enemies.push(new Tank(this.game, 'enemy', this._spawnPoint(55)));
     return count + tanks;
   }
