@@ -39,9 +39,18 @@
     transition: transform .08s;
   }
   .btn:active { transform: scale(.93); }
-  .tip { margin-top: 26px; font-size: clamp(13px,3.4vw,18px); color: #8fa0d8; line-height: 1.9; }
+  .tip { margin-top: 22px; font-size: clamp(13px,3.4vw,18px); color: #8fa0d8; line-height: 1.9; }
   .stat { margin-top: 18px; font-size: clamp(18px,4.5vw,26px); color:#ffe27a; font-weight:700;}
   .emoji-row { font-size: clamp(30px,8vw,56px); margin: 14px 0; letter-spacing: 6px; }
+
+  .pick-label { margin-top: 26px; font-size: clamp(15px,3.8vw,20px); color:#cdd8ff; font-weight:700; }
+  .colors { display: flex; gap: 16px; margin-top: 16px; flex-wrap: wrap; justify-content: center; }
+  .swatch {
+    width: 54px; height: 54px; border-radius: 50%; cursor: pointer;
+    border: 4px solid rgba(255,255,255,.25); transition: transform .1s, border-color .1s;
+  }
+  .swatch.sel { border-color: #fff; transform: scale(1.18); box-shadow: 0 0 18px rgba(255,255,255,.6); }
+  .swatch:active { transform: scale(1.05); }
 </style>
 </head>
 <body>
@@ -50,8 +59,10 @@
 <div id="startScreen" class="overlay">
   <div class="emoji-row">🚀 ✨ 👾</div>
   <div class="title">太空英雄</div>
-  <div class="subtitle">手指拖动飞船，自动开火，消灭外星人！</div>
+  <div class="subtitle">闯过 3 关，打败大 Boss！</div>
   <div class="tip">👆 按住屏幕拖动 = 移动飞船<br>💥 飞船会自动射击<br>🎁 吃道具变更强 · 🛡️ 躲开敌人和子弹</div>
+  <div class="pick-label">选择你的飞船颜色 👇</div>
+  <div class="colors" id="colors"></div>
   <button class="btn" id="startBtn">开始游戏</button>
 </div>
 
@@ -126,19 +137,49 @@
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
   const dist2 = (ax, ay, bx, by) => { const dx = ax-bx, dy = ay-by; return dx*dx + dy*dy; };
 
+  // ---------- 飞船颜色（玩家可选） ----------
+  const SHIP_COLORS = [
+    { name: "蓝色", top: "#fff", mid: "#7fd4ff", bot: "#2a7fd4", cockpit: "#ffe27a", swatch: "#3aa0ff" },
+    { name: "红色", top: "#fff", mid: "#ff8a8a", bot: "#d42a2a", cockpit: "#ffe27a", swatch: "#ff4d4d" },
+    { name: "绿色", top: "#fff", mid: "#8affb0", bot: "#1faf5a", cockpit: "#ffe27a", swatch: "#37d97a" },
+    { name: "黄色", top: "#fff", mid: "#ffe27a", bot: "#e0a020", cockpit: "#ff7ad4", swatch: "#ffd34e" },
+    { name: "紫色", top: "#fff", mid: "#d49bff", bot: "#7a2ad4", cockpit: "#ffe27a", swatch: "#b06bff" },
+  ];
+  let selectedColor = +(localStorage.getItem("spaceHeroColor") || 0);
+  if (selectedColor < 0 || selectedColor >= SHIP_COLORS.length) selectedColor = 0;
+
+  // ---------- 三关配置（每关有自己的背景主题与难度） ----------
+  const MAX_LEVEL = 3;
+  const LEVELS = [
+    { name: "蓝色星云", killsNeeded: 14, bossHp: 60,  enemySpeed: 1.0, sky1: "#0a1030", sky2: "#05050f", neb: "rgba(60,90,200,.18)" },
+    { name: "火焰星带", killsNeeded: 18, bossHp: 95,  enemySpeed: 1.18, sky1: "#2a0a14", sky2: "#0a0306", neb: "rgba(220,80,60,.18)" },
+    { name: "终焉黑洞", killsNeeded: 22, bossHp: 140, enemySpeed: 1.35, sky1: "#16082a", sky2: "#04020a", neb: "rgba(150,60,220,.20)" },
+  ];
+  function levelCfg() { return LEVELS[clamp(level-1, 0, MAX_LEVEL-1)]; }
+
   // ---------- 游戏状态 ----------
-  let player, bullets, enemies, eBullets, particles, powerups, stars;
-  let score, lives, level, running, spawnTimer, levelTimer, gunLevel, shield, speedBoost;
-  let lastShot, frame, screenShake, boss, bossTimer;
+  let player, bullets, enemies, eBullets, particles, powerups, stars, nebula;
+  let score, lives, level, running, spawnTimer, gunLevel, shield, speedBoost;
+  let lastShot, frame, screenShake, boss, phase, levelKills, banner;
   let best = +(localStorage.getItem("spaceHeroBest") || 0);
 
   function reset() {
     player = { x: W/2, y: H - 130, r: 26, tx: W/2, ty: H - 130 };
     bullets = []; enemies = []; eBullets = []; particles = []; powerups = [];
-    stars = makeStars();
+    stars = makeStars(); nebula = makeNebula();
     score = 0; lives = 3; level = 1; running = true;
-    spawnTimer = 0; levelTimer = 0; gunLevel = 1; shield = 0; speedBoost = 0;
-    lastShot = 0; frame = 0; screenShake = 0; boss = null; bossTimer = 0;
+    spawnTimer = 0; gunLevel = 1; shield = 0; speedBoost = 0;
+    lastShot = 0; frame = 0; screenShake = 0; boss = null;
+    phase = "wave"; levelKills = 0;
+    banner = { text: "第 1 关 · " + LEVELS[0].name, time: 2.2 };
+  }
+
+  function makeNebula() {
+    const arr = [];
+    for (let i = 0; i < 5; i++) {
+      arr.push({ x: rand(0, W), y: rand(0, H), r: rand(120, 280), sp: rand(6, 16) });
+    }
+    return arr;
   }
 
   function makeStars() {
@@ -188,13 +229,15 @@
 
   // ---------- 生成敌人 ----------
   function spawnEnemy() {
-    const types = ["grunt", "grunt", "zig", "tank"];
-    const type = level >= 3 ? types[randInt(0, types.length-1)] : (Math.random() < 0.75 ? "grunt" : "zig");
+    const cfg = levelCfg();
+    const type = level >= 3 ? ["grunt","grunt","zig","tank"][randInt(0,3)]
+               : level === 2 ? ["grunt","zig","zig","tank"][randInt(0,3)]
+               : (Math.random() < 0.78 ? "grunt" : "zig");
     const r = type === "tank" ? 34 : type === "zig" ? 22 : 24;
-    const hp = type === "tank" ? 4 + Math.floor(level/2) : type === "zig" ? 2 : 1;
+    const hp = type === "tank" ? 4 + level : type === "zig" ? 2 : 1;
     enemies.push({
       x: rand(40, W - 40), y: -40, r,
-      vy: rand(60, 90) + level * 8,
+      vy: (rand(60, 90) + level * 8) * cfg.enemySpeed,
       vx: type === "zig" ? rand(60, 120) * (Math.random()<.5?-1:1) : 0,
       type, hp, maxhp: hp,
       shootT: rand(0.8, 2.2), color: type==="tank"?"#ff5e5e":type==="zig"?"#b06bff":"#5ed1ff"
@@ -202,11 +245,14 @@
   }
 
   function spawnBoss() {
+    const cfg = levelCfg();
     boss = {
-      x: W/2, y: -120, r: 80, vx: 90, vy: 30,
-      hp: 60 + level * 20, maxhp: 60 + level * 20,
-      shootT: 1.0, phase: 0, entering: true
+      x: W/2, y: -120, r: 80, vx: 90 + level*10, vy: 30,
+      hp: cfg.bossHp, maxhp: cfg.bossHp,
+      shootT: 1.0, entering: true
     };
+    phase = "boss";
+    banner = { text: "⚠️ Boss 来了！", time: 1.6 };
     sfx.levelup();
   }
 
@@ -264,28 +310,30 @@
     player.x += (player.tx - player.x) * Math.min(1, dt * 14);
     player.y += (player.ty - player.y) * Math.min(1, dt * 14);
 
-    // 星空
+    // 横幅倒计时
+    if (banner && banner.time > 0) banner.time -= dt;
+
+    // 星空 & 星云背景滚动
     for (const s of stars) {
       s.y += s.sp * dt;
       if (s.y > H) { s.y = -2; s.x = rand(0, W); }
     }
+    for (const n of nebula) {
+      n.y += n.sp * dt;
+      if (n.y - n.r > H) { n.y = -n.r; n.x = rand(0, W); }
+    }
 
     playerShoot(dt);
 
-    // 关卡推进 / Boss
-    levelTimer += dt;
-    if (!boss && levelTimer > 22) {
-      levelTimer = 0;
-      spawnBoss();
-    }
-
-    // 生成普通敌人（Boss 在场时少一些）
-    if (!boss) {
+    // 关卡推进：先打够小怪 → 出 Boss → 打败 Boss → 下一关 / 通关
+    if (phase === "wave") {
+      const cfg = levelCfg();
       spawnTimer -= dt;
       if (spawnTimer <= 0) {
         spawnEnemy();
         spawnTimer = clamp(1.1 - level * 0.06, 0.35, 1.1);
       }
+      if (levelKills >= cfg.killsNeeded) spawnBoss();
     }
 
     // 玩家子弹
@@ -326,6 +374,7 @@
             explode(e.x, e.y, e.color, 18);
             sfx.boom();
             score += e.type === "tank" ? 30 : e.type === "zig" ? 20 : 10;
+            if (phase === "wave") levelKills++;
             if (Math.random() < 0.16) dropPowerup(e.x, e.y);
             enemies.splice(i, 1);
           }
@@ -336,7 +385,6 @@
 
     // Boss 逻辑
     if (boss) {
-      bossTimer += dt;
       if (boss.entering) {
         boss.y += 60 * dt;
         if (boss.y >= 130) boss.entering = false;
@@ -370,8 +418,15 @@
             screenShake = 0.6;
             for (let d = 0; d < 3; d++) dropPowerup(boss.x + rand(-40,40), boss.y);
             boss = null;
-            level++;
-            levelTimer = 0;
+            if (level >= MAX_LEVEL) {
+              win();
+            } else {
+              level++;
+              phase = "wave"; levelKills = 0; spawnTimer = 1.2;
+              eBullets.length = 0; // 清屏，给玩家喘息
+              banner = { text: "第 " + level + " 关 · " + levelCfg().name, time: 2.2 };
+              lives = Math.min(5, lives + 1); // 过关奖励一条命
+            }
             break;
           }
         }
@@ -423,10 +478,6 @@
       p.x += p.vx * dt; p.y += p.vy * dt;
       p.vx *= 0.96; p.vy *= 0.96;
     }
-
-    // 升级（按分数）
-    const wantLevel = 1 + Math.floor(score / 400);
-    if (wantLevel > level && !boss) { level = wantLevel; sfx.levelup(); }
   }
 
   function applyPowerup(kind) {
@@ -448,15 +499,19 @@
     if (lives <= 0) gameOver();
   }
 
-  function gameOver() {
+  function endScreen(emoji, title) {
     running = false;
     if (score > best) { best = score; localStorage.setItem("spaceHeroBest", best); }
     document.getElementById("goScore").textContent = "得分：" + score;
     document.getElementById("goBest").textContent = "最高分：" + best;
-    const won = score >= 1000;
-    document.getElementById("goEmoji").textContent = won ? "🏆" : "💥";
-    document.getElementById("goTitle").textContent = won ? "太厉害啦！" : "游戏结束";
+    document.getElementById("goEmoji").textContent = emoji;
+    document.getElementById("goTitle").textContent = title;
     gameOverScreen.classList.remove("hidden");
+  }
+  function gameOver() { endScreen("💥", "游戏结束"); }
+  function win() {
+    explode(player.x, player.y, "#ffd34e", 40);
+    endScreen("🏆", "通关啦！你是太空英雄！");
   }
 
   // ---------- 绘制 ----------
@@ -476,13 +531,14 @@
     ctx.lineTo(0, r * 0.35);
     ctx.lineTo(-r * 0.85, r * 0.7);
     ctx.closePath();
+    const c = SHIP_COLORS[selectedColor];
     const g = ctx.createLinearGradient(0, -r, 0, r);
-    g.addColorStop(0, "#fff"); g.addColorStop(0.5, "#7fd4ff"); g.addColorStop(1, "#2a7fd4");
+    g.addColorStop(0, c.top); g.addColorStop(0.5, c.mid); g.addColorStop(1, c.bot);
     ctx.fillStyle = g; ctx.fill();
     // 座舱
     ctx.beginPath();
     ctx.arc(0, -r * 0.1, r * 0.28, 0, Math.PI * 2);
-    ctx.fillStyle = "#ffe27a"; ctx.fill();
+    ctx.fillStyle = c.cockpit; ctx.fill();
     ctx.restore();
 
     // 护盾
@@ -580,7 +636,8 @@
     ctx.fillText("分数 " + score, 16, 36);
     ctx.fillStyle = "#9fb4ff";
     ctx.font = "bold 16px sans-serif";
-    ctx.fillText("关卡 " + level, 16, 60);
+    const prog = phase === "boss" ? "BOSS!" : levelKills + "/" + levelCfg().killsNeeded;
+    ctx.fillText("第 " + level + "/" + MAX_LEVEL + " 关 · " + levelCfg().name + "  (" + prog + ")", 16, 60);
     // 生命（右上）
     let hx = W - 22;
     ctx.font = "22px sans-serif"; ctx.textAlign = "right";
@@ -602,6 +659,22 @@
       ctx.translate(rand(-6,6)*screenShake*3, rand(-6,6)*screenShake*3);
     }
     ctx.clearRect(-20, -20, W + 40, H + 40);
+
+    // 背景：本关主题渐变天空
+    const cfg = levelCfg();
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, cfg.sky1); sky.addColorStop(1, cfg.sky2);
+    ctx.fillStyle = sky;
+    ctx.fillRect(-20, -20, W + 40, H + 40);
+
+    // 星云云团（柔和光斑）
+    for (const n of nebula) {
+      const rg = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
+      rg.addColorStop(0, cfg.neb);
+      rg.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = rg;
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI*2); ctx.fill();
+    }
 
     // 星空
     for (const s of stars) {
@@ -648,6 +721,22 @@
 
     ctx.restore();
     drawHUD();
+    drawBanner();
+  }
+
+  function drawBanner() {
+    if (!banner || banner.time <= 0) return;
+    const a = clamp(banner.time, 0, 1); // 最后 1 秒淡出
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.textAlign = "center";
+    ctx.font = "900 " + Math.round(clamp(W*0.07, 26, 52)) + "px sans-serif";
+    ctx.lineWidth = 6; ctx.strokeStyle = "rgba(0,0,0,.6)";
+    ctx.fillStyle = "#ffe27a";
+    ctx.strokeText(banner.text, W/2, H/2);
+    ctx.fillText(banner.text, W/2, H/2);
+    ctx.textAlign = "start";
+    ctx.restore();
   }
 
   // ---------- 主循环 ----------
@@ -674,6 +763,25 @@
   }
   document.getElementById("startBtn").addEventListener("click", startGame);
   document.getElementById("restartBtn").addEventListener("click", startGame);
+
+  // ---------- 飞船颜色选择器 ----------
+  (function buildColors() {
+    const box = document.getElementById("colors");
+    SHIP_COLORS.forEach((c, i) => {
+      const sw = document.createElement("div");
+      sw.className = "swatch" + (i === selectedColor ? " sel" : "");
+      sw.style.background = "radial-gradient(circle at 35% 30%, #fff7, " + c.swatch + ")";
+      sw.title = c.name;
+      sw.addEventListener("click", () => {
+        selectedColor = i;
+        localStorage.setItem("spaceHeroColor", i);
+        box.querySelectorAll(".swatch").forEach(s => s.classList.remove("sel"));
+        sw.classList.add("sel");
+        initAudio(); sfx.power();
+      });
+      box.appendChild(sw);
+    });
+  })();
   // 防止 iPad 双击缩放
   document.addEventListener("dblclick", e => e.preventDefault(), { passive: false });
   document.addEventListener("gesturestart", e => e.preventDefault());
