@@ -47,8 +47,9 @@
   <div class="tip">
     ☀️ 点掉下来的<b>阳光</b>收集能量<br>
     🪴 点上面的<b>植物卡片</b>，再点草地<b>种下</b>它<br>
-    🌻 向日葵产阳光 · 🌱 豌豆/西瓜/寒冰射手<b>打僵尸</b><br>
-    🔥 火炬树桩让豌豆变<b>火焰豌豆</b>（更厉害）<br>
+    🌻 向日葵产阳光 · 🌱 机枪/西瓜/寒冰射手<b>打僵尸</b><br>
+    🔫 机枪射手一次<b>连发 6 颗</b>子弹！<br>
+    🔥 火炬树桩让子弹变<b>火焰子弹</b>（更厉害）<br>
     🥜 坚果墙挡路 · 🍒 樱桃炸弹炸一片<br>
     🚜 别让僵尸走到最左边！撑过所有波数就<b>赢啦</b>
   </div>
@@ -108,7 +109,7 @@
   // ---------- 植物 / 僵尸 定义 ----------
   const PLANTS={
     sunflower:{name:"向日葵",cost:50,cd:6,hp:300,emoji:"🌻",role:"sun",interval:7},
-    peashooter:{name:"豌豆射手",cost:100,cd:6,hp:300,emoji:"🌱",role:"shoot",shot:"pea",interval:1.5},
+    peashooter:{name:"机枪射手",cost:100,cd:6,hp:300,emoji:"🌱",role:"shoot",shot:"pea",interval:2.4,burst:6,burstGap:0.08},
     snowpea:{name:"寒冰射手",cost:175,cd:8,hp:300,emoji:"❄️",role:"shoot",shot:"snow",interval:1.5},
     melon:{name:"西瓜投手",cost:300,cd:12,hp:300,emoji:"🍉",role:"shoot",shot:"melon",interval:2.6},
     torchwood:{name:"火炬树桩",cost:175,cd:8,hp:300,emoji:"🔥",role:"torch"},
@@ -148,7 +149,7 @@
   }
   function plantAt(type,r,c){
     const def=PLANTS[type];
-    plants.push({type,def,row:r,col:c,x:cellX(c),y:cellY(r),hp:def.hp,maxhp:def.hp,timer:def.role==="sun"?2:def.interval||0,fuse:def.role==="bomb"?0.55:0,pop:0.3});
+    plants.push({type,def,row:r,col:c,x:cellX(c),y:cellY(r),hp:def.hp,maxhp:def.hp,timer:def.role==="sun"?2:def.interval||0,fuse:def.role==="bomb"?0.55:0,pop:0.3,burst:0,burstTimer:0});
   }
   function spawnZombie(type,row){
     const def=ZOMBIES[type];
@@ -255,7 +256,15 @@
         // 本行有没有僵尸在右侧
         const has=zombies.some(z=>z.row===pl.row&&z.x>pl.x-cellW*0.3);
         pl.timer-=dt;
-        if(has&&pl.timer<=0){
+        if(pl.def.burst){
+          // 机枪射手：一次连发 burst 颗
+          if(pl.burst>0){
+            pl.burstTimer-=dt;
+            if(pl.burstTimer<=0){ fireFromPlant(pl); pl.burst--; pl.burstTimer=pl.def.burstGap; }
+          } else if(has&&pl.timer<=0){
+            pl.timer=pl.def.interval; pl.burst=pl.def.burst; pl.burstTimer=0;
+          }
+        } else if(has&&pl.timer<=0){
           pl.timer=pl.def.interval;
           fireFromPlant(pl);
         }
